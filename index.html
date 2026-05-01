@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pothole Dashboard</title>
+
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+    <style>
+        body {
+            background: #0f172a;
+            color: white;
+            font-family: Arial;
+            margin: 0;
+        }
+
+        h1 {
+            text-align: center;
+            padding: 10px;
+        }
+
+        .container {
+            display: flex;
+        }
+
+        #map {
+            width: 60%;
+            height: 90vh;
+        }
+
+        .side {
+            width: 40%;
+            padding: 10px;
+            overflow-y: scroll;
+            height: 90vh;
+        }
+
+        .stats {
+            display: flex;
+            gap: 10px;
+        }
+
+        .stat {
+            background: #1e293b;
+            padding: 10px;
+            border-radius: 10px;
+            flex: 1;
+            text-align: center;
+        }
+
+        .grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .card {
+            background: #1e293b;
+            padding: 8px;
+            border-radius: 10px;
+            width: 45%;
+        }
+
+        img {
+            width: 100%;
+            border-radius: 8px;
+        }
+
+        .info {
+            font-size: 11px;
+        }
+
+        /* 🔥 OPTIONAL BLINK */
+        .leaflet-interactive {
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>🚧 Live Pothole Dashboard</h1>
+
+<div class="container">
+
+    <!-- 🗺️ MAP -->
+    <div id="map"></div>
+
+    <!-- 📊 SIDE PANEL -->
+    <div class="side">
+
+        <!-- Stats -->
+        <div class="stats">
+            <div class="stat">
+                <h3>Total</h3>
+                <p id="total">0</p>
+            </div>
+
+            <div class="stat">
+                <h3>Today</h3>
+                <p id="today">0</p>
+            </div>
+
+            <div class="stat">
+                <h3>Last</h3>
+                <p id="last">--</p>
+            </div>
+        </div>
+
+        <!-- Images -->
+        <div class="grid" id="grid"></div>
+
+    </div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+    var map = L.map('map').setView([16.705, 74.243], 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')
+        .addTo(map);
+
+    var markers = [];
+
+    function loadData() {
+        fetch("/data")
+        .then(res => res.json())
+        .then(data => {
+
+            let grid = document.getElementById("grid");
+            grid.innerHTML = "";
+
+            // clear markers
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+
+            data.reverse();
+
+            let todayCount = 0;
+            let todayDate = new Date().toDateString();
+
+            data.forEach(item => {
+
+                // 🔥 STRONG RED MARKER
+                let marker = L.circleMarker([item.lat, item.lon], {
+                    radius: 10,
+                    color: "red",
+                    fillColor: "#ff0000",
+                    fillOpacity: 0.9
+                })
+                .addTo(map)
+                .bindPopup(`
+                    🚧 <b>Pothole Detected</b><br>
+                    📍 ${item.lat}, ${item.lon}<br>
+                    ⏱ ${item.time}
+                `);
+
+                markers.push(marker);
+
+                // 📊 today count
+                let d = new Date(item.time).toDateString();
+                if (d === todayDate) todayCount++;
+
+                // 📸 image
+                let filename = item.image.split("/").pop();
+                let imgUrl = "/images/" + filename + "?t=" + new Date().getTime();
+
+                let mapLink = `https://www.google.com/maps?q=${item.lat},${item.lon}`;
+
+                let card = document.createElement("div");
+                card.className = "card";
+
+                card.innerHTML = `
+                    <a href="${mapLink}" target="_blank">
+                        <img src="${imgUrl}">
+                    </a>
+                    <div class="info">
+                        📍 ${item.lat}, ${item.lon}<br>
+                        ⏱ ${item.time}
+                    </div>
+                `;
+
+                grid.appendChild(card);
+            });
+
+            // 🔥 AUTO ZOOM TO LATEST
+            if (data.length > 0) {
+                let latest = data[0];
+                map.setView([latest.lat, latest.lon], 17);
+            }
+
+            // 📊 stats update
+            document.getElementById("total").innerText = data.length;
+            document.getElementById("today").innerText = todayCount;
+            document.getElementById("last").innerText = data.length ? data[0].time : "--";
+
+        });
+    }
+
+    setInterval(loadData, 3000);
+    loadData();
+</script>
+
+</body>
+</html>
